@@ -1,0 +1,26 @@
+name: CI (expert, intentionally flawed)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No dependency pinning / no hash checking
+      - name: Install deps
+        run: |
+          python -m pip install -r web/requirements.txt
+
+      # No tests, no SAST (bandit), no dependency audit (pip-audit)
+      - name: Build image
+        run: |
+          docker build -t mycorp/escape-app:latest .
+
+      # No scan (trivy), no SBOM (syft), no signing (cosign)
+      - name: Push (mock)
+        run: echo "Pretend pushing latest..."

@@ -1,0 +1,30 @@
+services:
+  web:
+    build: .
+    command: ["python","web/app.py"]
+    ports:
+      - "5001:5000"
+    environment:
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
+      - FLAG_SUPPLY=${FLAG_SUPPLY}
+    depends_on:
+      - vault
+
+  vault:
+    build: .
+    command: ["python","vault/app.py"]
+    # 🔒 not exposed to host on purpose (internal only)
+    environment:
+      - VAULT_TOKEN=${VAULT_TOKEN}
+      - FLAG_VAULT=${FLAG_VAULT}
+
+  # "CI runner" helper container (optional) to simulate pipeline steps locally
+  ci:
+    image: alpine:3.20
+    working_dir: /work
+    volumes:
+      - ./:/work
+    entrypoint: ["/bin/sh","-lc"]
+    command: ["./scripts/pipeline.sh"]
+    profiles: ["ci"]
