@@ -204,6 +204,10 @@ curl "http://localhost:5001/fetch?url=http://vault:7000/debug"
 {"code": "SSRF_BLOCKED", "error": "URL refusée par la politique de sécurité"}
 ```
 
+**Preuve — résultat réel obtenu :**
+
+![Test SSRF bloqué — terminal](docs/screenshots/ssrf_blocked_test.png)
+
 ---
 
 #### 🔴 Test 2 — Attaque via localhost (doit être BLOQUÉ)
@@ -233,6 +237,12 @@ curl "http://localhost:5001/fetch?url=file:///etc/passwd"
 curl "http://localhost:5001/fetch?url=https://example.com"
 ```
 **Résultat attendu :** contenu HTML de example.com (la route fonctionne normalement)
+
+---
+
+### 🐳 Containers actifs pendant les tests
+
+![Docker Desktop — vault-1 et web-1 actifs](docs/screenshots/docker_containers_running.png)
 
 ---
 
