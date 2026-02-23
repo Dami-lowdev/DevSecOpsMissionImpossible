@@ -143,3 +143,126 @@ Condition : si un scan échoue → le pipeline échoue.
 ## Important
 
 Les attaques doivent rester inoffensives.
+
+---
+
+---
+
+## 🛡️ Blue Team — Correction SSRF (Branche `mike`)
+
+> **Auteur :** Mike · **Branche :** `mike` · **Commit :** `da569e8`
+> **Objectif :** Corriger la vulnérabilité SSRF de la route `/fetch` sans casser les fonctionnalités légitimes.
+
+---
+
+### 🔴 Vulnérabilité initiale (état rouge)
+
+```python
+# web/app.py — version vulnérable
+@app.route('/fetch')
+def fetch():
+    url = request.args.get('url', '')
+    resp = requests.get(url, timeout=5)   # ← aucune validation !
+    return resp.text
+```
+
+**Attaque possible :**
+```bash
+curl "http://localhost:5001/fetch?url=http://vault:7000/debug"
+# → retournait tous les secrets du vault (os.environ complet)
+```
+
+---
+
+### ✅ Correction appliquée — Défense en profondeur (5 couches)
+
+| Couche | Contrôle | Rôle |
+|--------|----------|------|
+| **1** | Schéma HTTP/HTTPS uniquement | Bloque `file://`, `ftp://`, `gopher://`, etc. |
+| **2** | Blocage des hostnames internes | Bloque `localhost`, `vault`, `internal`, `*.local` |
+| **3** | Résolution DNS + blocage IP privées | Bloque `127.x`, `10.x`, `172.16-31.x`, `192.168.x`, `169.254.x` |
+| **4** | Timeout strict (3s) + désactivation des redirections | Empêche le contournement par redirection |
+| **5** | Gestion d'erreur générique | Ne révèle aucune information interne en cas d'échec |
+
+---
+
+### 🧪 Comment tester la correction
+
+**Lancer l'application :**
+```bash
+docker-compose up --build -d
+```
+
+---
+
+#### 🔴 Test 1 — Attaque SSRF sur vault (doit être BLOQUÉ)
+```powershell
+curl "http://localhost:5001/fetch?url=http://vault:7000/debug"
+```
+**Résultat attendu :**
+```json
+{"code": "SSRF_BLOCKED", "error": "URL refusée par la politique de sécurité"}
+```
+
+---
+
+#### 🔴 Test 2 — Attaque via localhost (doit être BLOQUÉ)
+```powershell
+curl "http://localhost:5001/fetch?url=http://localhost/admin"
+```
+**Résultat attendu :**
+```json
+{"code": "SSRF_BLOCKED", "error": "URL refusée par la politique de sécurité"}
+```
+
+---
+
+#### 🔴 Test 3 — Schéma interdit (doit être BLOQUÉ)
+```powershell
+curl "http://localhost:5001/fetch?url=file:///etc/passwd"
+```
+**Résultat attendu :**
+```json
+{"code": "SSRF_BLOCKED", "error": "URL refusée par la politique de sécurité"}
+```
+
+---
+
+#### 🟢 Test 4 — URL externe légitime (doit fonctionner)
+```powershell
+curl "http://localhost:5001/fetch?url=https://example.com"
+```
+**Résultat attendu :** contenu HTML de example.com (la route fonctionne normalement)
+
+---
+
+### ⚙️ Tests automatisés (pytest)
+
+```bash
+pip install pytest
+pytest tests/test_ssrf_mitigation.py -v
+```
+
+**13 tests couvrant :**
+- Blocage vault, localhost, 127.0.0.1, IPs privées RFC1918
+- Blocage des schémas interdits (file://, ftp://)
+- Validation du rejet des redirections internes
+- Vérification que les URLs externes restent autorisées
+
+---
+
+### 💡 Justification des choix techniques
+
+- **Pas d'allowlist fixe** → trop restrictif pour un service générique de fetch
+- **Résolution DNS côté serveur** → la validation se fait APRÈS résolution (anti DNS rebinding)
+- **Timeout 3s** → évite les attaques de type Slowloris ou les scans de ports internes
+- **Erreur générique** → on ne révèle pas si c'est un blocage IP, DNS ou hostname
+
+---
+
+### 🚧 Limitations connues et documentées
+
+- **DNS rebinding avancé** : un serveur DNS malveillant peut répondre différemment entre validation et requête réelle (fenêtre de ~ms)
+- **SSRF via services cloud** : l'endpoint AWS `169.254.169.254` est bloqué, mais d'autres metadata endpoints (GCP, Azure) nécessiteraient des règles supplémentaires
+- **Pas d'allowlist de domaines** : si le besoin métier est connu, une allowlist serait plus sûre qu'une blocklist
+
