@@ -4,6 +4,7 @@ import json
 import requests
 from requests.exceptions import RequestException
 from flask import Flask, request, jsonify, abort, make_response, render_template_string
+import hmac
 
 app = Flask(__name__)
 
@@ -68,11 +69,11 @@ def fetch():
             "details": str(e)
         }), 502
 
-# Admin protected by static token (still bad)
+# Admin protected via Header Authorization
 @app.get("/admin")
 def admin():
-    token = request.args.get("token", "")
-    if token != os.getenv("ADMIN_TOKEN", ""):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not hmac.compare_digest(token, os.getenv("ADMIN_TOKEN", "MISSING_SECRETS_CHANGEME")):
         abort(403)
     return jsonify({
         "admin": True,

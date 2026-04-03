@@ -143,3 +143,51 @@ Condition : si un scan échoue → le pipeline échoue.
 ## Important
 
 Les attaques doivent rester inoffensives.
+
+---
+
+---
+
+## 🛡️ Blue Team — Hygiène des Secrets & Auth (Branche `yohann`)
+
+> **Auteur :** Yohann · **Branche :** `yohann`
+> **Objectif :** Corriger le stockage des secrets et le mécanisme d'authentification vulnérable de l'endpoint `/admin`.
+
+---
+
+### 🎯 Mission : Sécuriser les secrets & l'authentification (B3)
+
+Suite à l'audit red team qui a récupéré le `ADMIN_TOKEN` via le fichier `.env` commité dans Git et un paramètre GET faible, des mesures de l'approche DevSecOps pour l'hygiène des secrets ont été implémentées.
+
+---
+
+### ✅ Correctifs Appliqués
+
+1. **Suppression du `.env` du repo Git :**
+   - Le fichier contenant les vrais tokens secrets de production a été supprimé des commits et ignoré (`.gitignore`) pour éviter toute fuite.
+
+2. **Création d'un modèle d'environnement anonymisé :**
+   - Un fichier `.env.example` placeholder a été ajouté pour guider l'onboarding de l'équipe sans exposer la donnée.
+
+3. **Renforcement de l'authentification (`/admin`) :**
+   - L'endpoint ne lit plus le token dans l'URL `?token=...`.
+   - Il lit sécuritairement dans l'entête HTTP `Authorization: Bearer <token>`, protégeant contre l'expiration de logs proxy ou historique du navigateur.
+   - La comparaison du mot de passe s'effectue désormaus via la méthode stricte `hmac.compare_digest()` afin de mitiger les Timing Attacks (Side-channel).
+
+---
+
+### 🧪 Preuve de validation
+
+**Test 1 — Défense de l'ancienne attaque (GET parameter ignoré) :**
+```bash
+curl "http://localhost:5001/admin?token=VRAI_TOKEN_VOLE"
+# → Résultat: 403 Forbidden
+```
+
+**Test 2 — Auth Sécurisée (Header) :**
+```bash
+curl -H "Authorization: Bearer <mon_nouveau_vrai_token>" "http://localhost:5001/admin"
+# → Résultat: 200 OK avec payload
+```
+
+Le code complet et documenté est disponible dans `docs/yohann/RAPPORT.md` sur la branche `yohann`.
