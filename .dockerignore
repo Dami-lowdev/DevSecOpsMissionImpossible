@@ -1,0 +1,11 @@
+# Fichiers sensibles et inutiles
+.env
+.git/
+.github/
+docs/
+scripts/
+
+# Fichiers temporaires
+__pycache__/
+*.pyc
+.pytest_cache/

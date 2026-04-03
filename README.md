@@ -143,3 +143,58 @@ Condition : si un scan échoue → le pipeline échoue.
 ## Important
 
 Les attaques doivent rester inoffensives.
+
+---
+
+---
+
+## 🛡️ Blue Team — Durcissement Docker & Sécurisation (Branche `andrisca`)
+
+> **Auteur :** Andrisca · **Branche :** `andrisca`
+> **Objectif :** Résoudre l'exfiltration de données via `/debug` et imposer des bonnes pratiques Docker.
+
+---
+
+### 🎯 Mission : Durcir le conteneur Docker (B4)
+
+L'audit précédant avait révélé que l'image Docker initiale exposait dangereusement le contexte de build (tels que `.env`, `.git`) et s'exécutait avec les droits complets `root`. L'API `vault` fournissait, en plus, une fonctionnalité extrêmement toxique (`/debug`).
+
+---
+
+### ✅ Correctifs Appliqués
+
+1. **Suppression du `/debug` :**
+   - L'endpoint `/debug` dans `vault/app.py` a été purement et simplement effacé de l'application logicielle pour fermer la brèche.
+
+2. **Création du `.dockerignore` :**
+   - Tous les fichiers secrets et les données superflues ont été bloqués; ils ne sont plus injectés dans le conteneur par la ligne `COPY . /app`. Il est désormais impossible d'extraire un `ADMIN_TOKEN` ou un `VAULT_TOKEN` depuis l'image déployée.
+
+3. **Abandon des droits administrateur (Non-Root User) :**
+   - Le `Dockerfile` déclare un `appuser` unique. Les éventuelles failles de type (Remote Code Execution - RCE) verront désormais leur sévérité drastiquement réduite, l'attaquant opérant en mode contraint.
+
+4. **Installation d'un Healthcheck interne :**
+   - L'état de santé du micro-service est dorénavant scruté automatiquement afin d'assurer l'opérabilité du processus applicatif.
+
+---
+
+### 🧪 Preuve de validation
+
+**Test 1 — Validation du `.dockerignore` (`.env` effacé de l'image) :**
+```bash
+docker exec -it <id> cat /app/.env
+# → cat: /app/.env: No such file or directory
+```
+
+**Test 2 — Validation du Non-Root User :**
+```bash
+docker exec -it <id> whoami
+# → appuser
+```
+
+**Test 3 — Validation de fermeture de port (SSRF obsolète) :**
+```bash
+curl "http://localhost:5001/fetch?url=http://vault:7000/debug"
+# → 404 Not Found (Exfiltration corrigée)
+```
+
+Le code complet ainsi que la documentation technique détaillée sont disponibles dans `docs/andrisca/RAPPORT.md` sur la branche `andrisca`.

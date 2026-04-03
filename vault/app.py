@@ -17,9 +17,7 @@ def secret():
 def health():
     return jsonify({"ok":True})
 
-@app.get("/debug")
-def debug():
-    return jsonify(dict(os.environ))
+# Removed /debug endpoint to prevent environment variables exfiltration
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=7000)
