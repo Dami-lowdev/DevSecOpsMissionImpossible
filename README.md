@@ -143,3 +143,51 @@ Condition : si un scan échoue → le pipeline échoue.
 ## Important
 
 Les attaques doivent rester inoffensives.
+
+---
+
+---
+
+## 🛡️ Blue Team — CI/CD Pipeline & Protection Vault (Branche `damien`)
+
+> **Auteur :** Damien · **Branche :** `damien`
+> **Objectif :** Implémenter de robustes barrières DevSecOps (Quality gates) dans la CI (Pipeline) et sécuriser la connexion interne secrète du Vault.
+
+---
+
+### 🎯 Mission : Sécuriser la Supply Chain (B2) & l'Authentification
+
+L'audit ayant permis l'extraction pure d'un flag grâce aux failles conjuguées de la mauvaise gestion de pipeline (script désactivé) et du transit en clair d'un identifiant secret, il était primordial de sécuriser de l'acheminement code-to-production jusqu'à la logique d'authentification machine-à-machine.
+
+---
+
+### ✅ Correctifs Appliqués
+
+1. **Intégration DevSecOps / Supply Chain dans la CI :**
+   - Le script CI factice `scripts/pipeline.sh` a été revu pour faire office de forteresse. 
+   - **SAST** : Utilisation programmative de l'analyseur `bandit`.  
+   - **Audit applicatif** : Interfaçage avec `pip-audit` contre les dépendances toxiques Python.
+   - **Scanning d'Image Trivy** : Ajout d'une condition d'échec de la pipeline en cas de détection à Sévérité `HIGH` ou `CRITICAL`.
+   - **Immutabilité** : L'anonyme flag `:latest` est remplacé en continu par un tag de construction hashé sur `git rev-parse`.
+
+2. **Fortification Auth de `/secret` (Machine to Machine) :**
+   - À l'image de la route externe `/admin`, l'accès vers `/secret` au sein du module **Vault** exige désormais la transmission du marqueur par Header cryptographique (`Authorization: Bearer`), éliminant l'exfiltration via journalisation de proxy par URL.
+   - Le timing de lecture du sceau secret est désormais géré par `hmac.compare_digest`.
+
+---
+
+### 🧪 Preuve de validation
+
+**Test 1 — Défense API :**
+```bash
+curl "http://localhost:5001/fetch?url=http://vault:7000/secret?token=7Db33s...<volé>"
+# → 403 Forbidden
+```
+
+**Test 2 — Déploiement Pipeline automatisée :**
+```bash
+$ ./scripts/pipeline.sh
+# La pipeline exécute et valide les scans Bandit / Pip-Audit / Trivy et génère le hachage propre.
+```
+
+Le code complet et documenté est disponible dans `docs/damien/RAPPORT.md` sur la branche `damien`.

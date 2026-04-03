@@ -3,10 +3,14 @@ from flask import Flask, request, jsonify, abort
 
 app = Flask(__name__)
 
+import hmac
+
 @app.get("/secret")
 def secret():
-    tok = request.args.get("token", "")
-    if tok != os.getenv("VAULT_TOKEN", ""):
+    auth_header = request.headers.get("Authorization", "")
+    tok = auth_header.replace("Bearer ", "")
+    
+    if not hmac.compare_digest(tok, os.getenv("VAULT_TOKEN", "MISSING_VAULT_TOKEN")):
         abort(403)
     return jsonify({
         "vault": "ok",
